@@ -40,8 +40,8 @@ import (
 	"github.com/aws/aws-sdk-go/service/dynamodb"
 	"github.com/aws/aws-sdk-go/service/dynamodb/dynamodbiface"
 
-	cfg "github.com/vmware/vmware-go-kcl/clientlibrary/config"
-	par "github.com/vmware/vmware-go-kcl/clientlibrary/partition"
+	cfg "github.com/kanishk509/go-kcl/clientlibrary/config"
+	par "github.com/kanishk509/go-kcl/clientlibrary/partition"
 )
 
 func TestDoesTableExist(t *testing.T) {
@@ -126,7 +126,9 @@ func TestGetLeaseAquired(t *testing.T) {
 		Checkpoint: "deadbeef",
 		Mux:        &sync.Mutex{},
 	}
-	err := checkpoint.GetLease(shard, "ijkl-mnop")
+
+	newLeaseOwner := "ijkl-mnop"
+	err := checkpoint.GetLease(shard, newLeaseOwner)
 
 	if err != nil {
 		t.Errorf("Lease not aquired after timeout %s", err)
@@ -140,7 +142,7 @@ func TestGetLeaseAquired(t *testing.T) {
 	}
 
 	// release owner info
-	err = checkpoint.RemoveLeaseOwner(shard.ID)
+	err = checkpoint.RemoveLeaseOwner(shard.ID, newLeaseOwner)
 	assert.Nil(t, err)
 
 	status := &par.ShardStatus{

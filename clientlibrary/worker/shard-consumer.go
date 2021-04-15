@@ -28,7 +28,6 @@
 package worker
 
 import (
-	"errors"
 	"math"
 	"sync"
 	"time"
@@ -39,11 +38,11 @@ import (
 	"github.com/aws/aws-sdk-go/service/kinesis/kinesisiface"
 	deagg "github.com/awslabs/kinesis-aggregation/go/deaggregator"
 
-	chk "github.com/vmware/vmware-go-kcl/clientlibrary/checkpoint"
-	"github.com/vmware/vmware-go-kcl/clientlibrary/config"
-	kcl "github.com/vmware/vmware-go-kcl/clientlibrary/interfaces"
-	"github.com/vmware/vmware-go-kcl/clientlibrary/metrics"
-	par "github.com/vmware/vmware-go-kcl/clientlibrary/partition"
+	chk "github.com/kanishk509/go-kcl/clientlibrary/checkpoint"
+	"github.com/kanishk509/go-kcl/clientlibrary/config"
+	kcl "github.com/kanishk509/go-kcl/clientlibrary/interfaces"
+	"github.com/kanishk509/go-kcl/clientlibrary/metrics"
+	par "github.com/kanishk509/go-kcl/clientlibrary/partition"
 )
 
 const (
@@ -159,14 +158,32 @@ func (sc *ShardConsumer) getRecords(shard *par.ShardStatus) error {
 	retriedErrors := 0
 
 	for {
+		err := sc.checkpointer.FetchCheckpoint(shard)
+		if err != nil && err != chk.ErrSequenceIDNotFound {
+			log.Errorf("Error fetching checkpoint", err)
+			time.Sleep(time.Duration(sc.kclConfig.IdleTimeBetweenReadsInMillis) * time.Millisecond)
+			continue
+		}
+
+		if shard.ClaimedBy != "" || shard.GetLeaseOwner() != sc.consumerID {
+			// Another worker wants to steal our shard. So let the lease lapse
+			log.Infof("Shard %s has been stolen from us", shard.ID)
+			shutdownInput := &kcl.ShutdownInput{ShutdownReason: kcl.ZOMBIE}
+			sc.recordProcessor.Shutdown(shutdownInput)
+			return nil
+		}
+
 		if time.Now().UTC().After(shard.LeaseTimeout.Add(-time.Duration(sc.kclConfig.LeaseRefreshPeriodMillis) * time.Millisecond)) {
 			log.Debugf("Refreshing lease on shard: %s for worker: %s", shard.ID, sc.consumerID)
 			err = sc.checkpointer.GetLease(shard, sc.consumerID)
 			if err != nil {
-				if errors.As(err, &chk.ErrLeaseNotAcquired{}) {
+				// if errors.As(err, &chk.ErrLeaseNotAcquired{}) {
+				if e, ok := err.(*chk.ErrLeaseNotAcquired); ok {
 					log.Warnf("Failed in acquiring lease on shard: %s for worker: %s", shard.ID, sc.consumerID)
+					log.Warnf(e.Error())
 					return nil
 				}
+
 				// log and return error
 				log.Errorf("Error in refreshing lease on shard: %s for worker: %s. Error: %+v",
 					shard.ID, sc.consumerID, err)
@@ -263,6 +280,7 @@ func (sc *ShardConsumer) getRecords(shard *par.ShardStatus) error {
 			sc.recordProcessor.Shutdown(shutdownInput)
 			return nil
 		}
+
 		shardIterator = getResp.NextShardIterator
 
 		select {
@@ -308,7 +326,7 @@ func (sc *ShardConsumer) releaseLease(shard *par.ShardStatus) {
 
 	// Release the lease by wiping out the lease owner for the shard
 	// Note: we don't need to do anything in case of error here and shard lease will eventuall be expired.
-	if err := sc.checkpointer.RemoveLeaseOwner(shard.ID); err != nil {
+	if err := sc.checkpointer.RemoveLeaseOwner(shard.ID, sc.consumerID); err != nil {
 		log.Errorf("Failed to release shard lease or shard: %s Error: %+v", shard.ID, err)
 	}
 

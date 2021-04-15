@@ -37,9 +37,9 @@ import (
 	"github.com/aws/aws-sdk-go/service/dynamodb"
 	"github.com/aws/aws-sdk-go/service/dynamodb/dynamodbiface"
 
-	"github.com/vmware/vmware-go-kcl/clientlibrary/config"
-	par "github.com/vmware/vmware-go-kcl/clientlibrary/partition"
-	"github.com/vmware/vmware-go-kcl/logger"
+	"github.com/kanishk509/go-kcl/clientlibrary/config"
+	par "github.com/kanishk509/go-kcl/clientlibrary/partition"
+	"github.com/kanishk509/go-kcl/logger"
 )
 
 const (
@@ -181,7 +181,7 @@ func (checkpointer *DynamoCheckpoint) GetLease(shard *par.ShardStatus, newAssign
 		}
 	}
 
-	err = checkpointer.conditionalUpdate(conditionalExpression, expressionAttributeValues, marshalledCheckpoint)
+	err = checkpointer.conditionalPut(conditionalExpression, expressionAttributeValues, marshalledCheckpoint)
 	if err != nil {
 		if awsErr, ok := err.(awserr.Error); ok {
 			if awsErr.Code() == dynamodb.ErrCodeConditionalCheckFailedException {
@@ -236,13 +236,20 @@ func (checkpointer *DynamoCheckpoint) FetchCheckpoint(shard *par.ShardStatus) er
 		return ErrSequenceIDNotFound
 	}
 	checkpointer.log.Debugf("Retrieved Shard Iterator %s", *sequenceID.S)
+
 	shard.Mux.Lock()
 	defer shard.Mux.Unlock()
+
 	shard.Checkpoint = aws.StringValue(sequenceID.S)
 
 	if assignedTo, ok := checkpoint[LeaseOwnerKey]; ok {
 		shard.AssignedTo = aws.StringValue(assignedTo.S)
 	}
+
+	if claimedBy, ok := checkpoint[ClaimedByKey]; ok {
+		shard.ClaimedBy = aws.StringValue(claimedBy.S)
+	}
+
 	return nil
 }
 
@@ -260,20 +267,92 @@ func (checkpointer *DynamoCheckpoint) RemoveLeaseInfo(shardID string) error {
 }
 
 // RemoveLeaseOwner to remove lease owner for the shard entry
-func (checkpointer *DynamoCheckpoint) RemoveLeaseOwner(shardID string) error {
-	input := &dynamodb.UpdateItemInput{
-		TableName: aws.String(checkpointer.TableName),
-		Key: map[string]*dynamodb.AttributeValue{
-			LeaseKeyKey: {
-				S: aws.String(shardID),
-			},
+func (checkpointer *DynamoCheckpoint) RemoveLeaseOwner(shardID string, owner string) error {
+	conditionalExpression := `ShardID = :id AND
+	AssignedTo = :assigned_to`
+
+	expressionAttributeValues := map[string]*dynamodb.AttributeValue{
+		":id": {
+			S: &shardID,
 		},
-		UpdateExpression: aws.String("remove " + LeaseOwnerKey),
+		":assigned_to": {
+			S: &owner,
+		},
 	}
 
-	_, err := checkpointer.svc.UpdateItem(input)
+	updateExpression := "remove " + LeaseOwnerKey
 
-	return err
+	return checkpointer.conditionalUpdate(conditionalExpression, expressionAttributeValues, updateExpression)
+}
+
+func (checkpointer *DynamoCheckpoint) FetchWorkers() (map[string][]string, error) {
+	items, err := checkpointer.svc.Scan(&dynamodb.ScanInput{
+		TableName: aws.String(checkpointer.TableName),
+	})
+	if err != nil {
+		return nil, err
+	}
+	workers := make(map[string][]string)
+	for _, i := range items.Items {
+		// Ignore closed shards, only return active shards
+		if seq, ok := i[SequenceNumberKey]; ok && *seq.S == ShardEnd {
+			continue
+		}
+
+		if s, ok := i[LeaseKeyKey]; !ok || s.S == nil {
+			continue
+		}
+		shardID := *i[LeaseKeyKey].S
+
+		if w, ok := i[LeaseOwnerKey]; !ok || w.S == nil {
+			continue
+		}
+		workerID := *i[LeaseOwnerKey].S
+
+		// Add worker to map if not already added
+		if _, ok := workers[workerID]; !ok {
+			workers[workerID] = []string{}
+		}
+
+		// Add shard for the worker if not claimed
+		if c, ok := i[ClaimedByKey]; !ok || c.S == nil {
+			workers[workerID] = append(workers[workerID], shardID)
+		}
+	}
+	return workers, nil
+}
+
+func (checkpointer *DynamoCheckpoint) ClaimShard(shard *par.ShardStatus, fromWorkerID string, toWorkerID string) error {
+	err := checkpointer.FetchCheckpoint(shard)
+	if err != nil {
+		return err
+	}
+
+	conditionalExpression := `ShardID = :id AND
+	AssignedTo = :assigned_to AND
+	(attribute_not_exists(Checkpoint) OR Checkpoint <> :shard_end) AND
+	attribute_not_exists(ClaimedBy)`
+
+	// we need a string pointer for ShardEnd in expressionAttributeValues
+	shardEnd := ShardEnd
+	expressionAttributeValues := map[string]*dynamodb.AttributeValue{
+		":id": {
+			S: &shard.ID,
+		},
+		":assigned_to": {
+			S: &fromWorkerID,
+		},
+		":shard_end": {
+			S: &shardEnd,
+		},
+		":claimer": {
+			S: &toWorkerID,
+		},
+	}
+
+	updateExpression := "SET ClaimedBy = :claimer"
+
+	return checkpointer.conditionalUpdate(conditionalExpression, expressionAttributeValues, updateExpression)
 }
 
 func (checkpointer *DynamoCheckpoint) createTable() error {
@@ -315,7 +394,7 @@ func (checkpointer *DynamoCheckpoint) saveItem(item map[string]*dynamodb.Attribu
 	})
 }
 
-func (checkpointer *DynamoCheckpoint) conditionalUpdate(conditionExpression string, expressionAttributeValues map[string]*dynamodb.AttributeValue, item map[string]*dynamodb.AttributeValue) error {
+func (checkpointer *DynamoCheckpoint) conditionalPut(conditionExpression string, expressionAttributeValues map[string]*dynamodb.AttributeValue, item map[string]*dynamodb.AttributeValue) error {
 	return checkpointer.putItem(&dynamodb.PutItemInput{
 		ConditionExpression:       aws.String(conditionExpression),
 		TableName:                 aws.String(checkpointer.TableName),
@@ -324,8 +403,22 @@ func (checkpointer *DynamoCheckpoint) conditionalUpdate(conditionExpression stri
 	})
 }
 
+func (checkpointer *DynamoCheckpoint) conditionalUpdate(conditionExpression string, expressionAttributeValues map[string]*dynamodb.AttributeValue, updateExpression string) error {
+	return checkpointer.updateItem(&dynamodb.UpdateItemInput{
+		ConditionExpression:       aws.String(conditionExpression),
+		TableName:                 aws.String(checkpointer.TableName),
+		UpdateExpression:          aws.String(updateExpression),
+		ExpressionAttributeValues: expressionAttributeValues,
+	})
+}
+
 func (checkpointer *DynamoCheckpoint) putItem(input *dynamodb.PutItemInput) error {
 	_, err := checkpointer.svc.PutItem(input)
+	return err
+}
+
+func (checkpointer *DynamoCheckpoint) updateItem(input *dynamodb.UpdateItemInput) error {
+	_, err := checkpointer.svc.UpdateItem(input)
 	return err
 }
 

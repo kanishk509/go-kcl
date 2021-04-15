@@ -37,6 +37,7 @@ type ShardStatus struct {
 	ParentShardId string
 	Checkpoint    string
 	AssignedTo    string
+	ClaimedBy     string
 	Mux           *sync.Mutex
 	LeaseTimeout  time.Time
 	// Shard Range

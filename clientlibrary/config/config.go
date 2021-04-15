@@ -41,8 +41,8 @@ import (
 
 	"github.com/aws/aws-sdk-go/aws"
 	creds "github.com/aws/aws-sdk-go/aws/credentials"
-	"github.com/vmware/vmware-go-kcl/clientlibrary/metrics"
-	"github.com/vmware/vmware-go-kcl/logger"
+	"github.com/kanishk509/go-kcl/clientlibrary/metrics"
+	"github.com/kanishk509/go-kcl/logger"
 )
 
 const (
@@ -229,6 +229,9 @@ type (
 
 		// Max leases to steal at one time (for load balancing)
 		MaxLeasesToStealAtOneTime int
+
+		// Time added to LeaseTimeout after which the shard claim will expire
+		ClaimExpirePeriodMillis int
 
 		// Read capacity to provision when creating the lease table (dynamoDB).
 		InitialLeaseTableReadCapacity int

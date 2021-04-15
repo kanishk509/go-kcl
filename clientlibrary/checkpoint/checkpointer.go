@@ -31,7 +31,7 @@ import (
 	"errors"
 	"fmt"
 
-	par "github.com/vmware/vmware-go-kcl/clientlibrary/partition"
+	par "github.com/kanishk509/go-kcl/clientlibrary/partition"
 )
 
 const (
@@ -40,9 +40,11 @@ const (
 	LeaseTimeoutKey   = "LeaseTimeout"
 	SequenceNumberKey = "Checkpoint"
 	ParentShardIdKey  = "ParentShardId"
+	ClaimedByKey      = "ClaimedBy"
 
 	// We've completely processed all records in this shard.
-	ShardEnd = "SHARD_END"
+	ShardEnd      = "SHARD_END"
+	ShardReleased = "SHARD_RELEASED"
 )
 
 type ErrLeaseNotAcquired struct {
@@ -71,7 +73,13 @@ type Checkpointer interface {
 	RemoveLeaseInfo(string) error
 
 	// RemoveLeaseOwner to remove lease owner for the shard entry to make the shard available for reassignment
-	RemoveLeaseOwner(string) error
+	RemoveLeaseOwner(string, string) error
+
+	// FetchWorkers returns a map of active workers and the shards assigned to each
+	FetchWorkers() (map[string][]string, error)
+
+	// ClaimShard marks a shard to be stolen by another worker
+	ClaimShard(*par.ShardStatus, string, string) error
 }
 
 // ErrSequenceIDNotFound is returned by FetchCheckpoint when no SequenceID is found

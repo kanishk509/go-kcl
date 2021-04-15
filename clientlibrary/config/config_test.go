@@ -19,7 +19,7 @@
 package config
 
 import (
-	"github.com/vmware/vmware-go-kcl/logger"
+	"github.com/kanishk509/go-kcl/logger"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
