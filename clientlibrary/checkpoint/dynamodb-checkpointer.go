@@ -126,6 +126,14 @@ func (checkpointer *DynamoCheckpoint) GetLease(shard *par.ShardStatus, newAssign
 
 	assignedVar, assignedToOk := currentCheckpoint[LeaseOwnerKey]
 	leaseVar, leaseTimeoutOk := currentCheckpoint[LeaseTimeoutKey]
+	claimedVar, claimedByOk := currentCheckpoint[ClaimedByKey]
+
+	if claimedByOk {
+		if claimedBy := *claimedVar.S; claimedBy != newAssignTo {
+			return ErrLeaseNotAcquired{"shard claimed by another worker"}
+		}
+	}
+
 	var conditionalExpression string
 	var expressionAttributeValues map[string]*dynamodb.AttributeValue
 
@@ -140,7 +148,9 @@ func (checkpointer *DynamoCheckpoint) GetLease(shard *par.ShardStatus, newAssign
 			return err
 		}
 
-		if time.Now().UTC().Before(currentLeaseTimeout) && assignedTo != newAssignTo {
+		if time.Now().UTC().Before(currentLeaseTimeout) &&
+			assignedTo != newAssignTo &&
+			!claimedByOk {
 			return ErrLeaseNotAcquired{"current lease timeout not yet expired"}
 		}
 
@@ -280,7 +290,30 @@ func (checkpointer *DynamoCheckpoint) RemoveLeaseOwner(shardID string, owner str
 		},
 	}
 
-	updateExpression := "remove " + LeaseOwnerKey
+	updateExpression := "REMOVE AssignedTo"
+
+	return checkpointer.conditionalUpdate(conditionalExpression, expressionAttributeValues, updateExpression)
+}
+
+// ReleaseShard to release a claimed shard for stealing
+func (checkpointer *DynamoCheckpoint) ReleaseShard(shardID string, owner string) error {
+	conditionalExpression := `ShardID = :id AND
+	AssignedTo = :assigned_to`
+
+	shardReleased := ShardReleased
+	expressionAttributeValues := map[string]*dynamodb.AttributeValue{
+		":id": {
+			S: &shardID,
+		},
+		":assigned_to": {
+			S: &owner,
+		},
+		":shard_released": {
+			S: &shardReleased,
+		},
+	}
+
+	updateExpression := "SET AssignedTo = :shard_released"
 
 	return checkpointer.conditionalUpdate(conditionalExpression, expressionAttributeValues, updateExpression)
 }
@@ -333,7 +366,7 @@ func (checkpointer *DynamoCheckpoint) ClaimShard(shard *par.ShardStatus, fromWor
 	(attribute_not_exists(Checkpoint) OR Checkpoint <> :shard_end) AND
 	attribute_not_exists(ClaimedBy)`
 
-	// we need a string pointer for ShardEnd in expressionAttributeValues
+	// need a string pointer for ShardEnd in expressionAttributeValues
 	shardEnd := ShardEnd
 	expressionAttributeValues := map[string]*dynamodb.AttributeValue{
 		":id": {
@@ -345,14 +378,33 @@ func (checkpointer *DynamoCheckpoint) ClaimShard(shard *par.ShardStatus, fromWor
 		":shard_end": {
 			S: &shardEnd,
 		},
-		":claimer": {
+		":claim_owner": {
 			S: &toWorkerID,
 		},
 	}
 
-	updateExpression := "SET ClaimedBy = :claimer"
+	updateExpression := "SET ClaimedBy = :claim_owner"
 
 	return checkpointer.conditionalUpdate(conditionalExpression, expressionAttributeValues, updateExpression)
+}
+
+func (checkpointer *DynamoCheckpoint) ClearClaim(shardID string, claimOwner string) error {
+	conditionalExpression := `ShardID = :id AND
+	ClaimedBy = :claim_owner`
+
+	expressionAttributeValues := map[string]*dynamodb.AttributeValue{
+		":id": {
+			S: &shardID,
+		},
+		":claim_owner": {
+			S: &claimOwner,
+		},
+	}
+
+	updateExpression := "REMOVE ClaimedBy"
+
+	return checkpointer.conditionalUpdate(conditionalExpression, expressionAttributeValues, updateExpression)
+
 }
 
 func (checkpointer *DynamoCheckpoint) createTable() error {

@@ -43,7 +43,9 @@ const (
 	ClaimedByKey      = "ClaimedBy"
 
 	// We've completely processed all records in this shard.
-	ShardEnd      = "SHARD_END"
+	ShardEnd = "SHARD_END"
+
+	// Value of LeaseOwner attribute for released shards
 	ShardReleased = "SHARD_RELEASED"
 )
 
@@ -75,11 +77,17 @@ type Checkpointer interface {
 	// RemoveLeaseOwner to remove lease owner for the shard entry to make the shard available for reassignment
 	RemoveLeaseOwner(string, string) error
 
+	// Release a claimed shard for stealing
+	ReleaseShard(string, string) error
+
 	// FetchWorkers returns a map of active workers and the shards assigned to each
 	FetchWorkers() (map[string][]string, error)
 
 	// ClaimShard marks a shard to be stolen by another worker
 	ClaimShard(*par.ShardStatus, string, string) error
+
+	// ClearClaim removes the claim on a shard
+	ClearClaim(string, string) error
 }
 
 // ErrSequenceIDNotFound is returned by FetchCheckpoint when no SequenceID is found

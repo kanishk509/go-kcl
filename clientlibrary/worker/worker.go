@@ -277,16 +277,21 @@ func (w *Worker) eventLoop() {
 
 				stealingShard := false
 				if shard.ClaimedBy != "" {
-					// now > LeaseTimeout + ClaimExpire
 					if time.Now().After(shard.LeaseTimeout.Add(time.Duration(w.kclConfig.ClaimExpirePeriodMillis) * time.Millisecond)) {
+						// now > LeaseTimeout + ClaimExpire
+						// Claim expired
 						log.Debugf("Claim by %s on %s expired. Ignoring the claim.", shard.ClaimedBy, shard.ID)
+						w.checkpointer.ClearClaim(shard.ID, shard.ClaimedBy)
 					} else if shard.ClaimedBy != w.workerID {
+						// claimed by another worker
 						log.Debugf("Shard %s being stolen by %s.", shard.ID, shard.ClaimedBy)
 						continue
 					} else if shard.GetLeaseOwner() != chk.ShardReleased {
+						// claimed by us but shard not yet released
 						log.Debugf("Shard %s claimed by us(%s) but not yet released.", shard.ID, w.workerID)
 						continue
 					} else {
+						// shard released to us. Can steal shard now
 						log.Debugf("Shard %s released us(%s).", shard.ID, w.workerID)
 						stealingShard = true
 					}

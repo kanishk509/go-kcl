@@ -165,9 +165,9 @@ func (sc *ShardConsumer) getRecords(shard *par.ShardStatus) error {
 			continue
 		}
 
-		if shard.ClaimedBy != "" || shard.GetLeaseOwner() != sc.consumerID {
+		if shard.ClaimedBy != "" {
 			// Another worker wants to steal our shard. So let the lease lapse
-			log.Infof("Shard %s has been stolen from us", shard.ID)
+			log.Infof("Shard %s being stolen from us", shard.ID)
 			shutdownInput := &kcl.ShutdownInput{ShutdownReason: kcl.ZOMBIE}
 			sc.recordProcessor.Shutdown(shutdownInput)
 			return nil
@@ -324,9 +324,9 @@ func (sc *ShardConsumer) releaseLease(shard *par.ShardStatus) {
 	log.Infof("Release lease for shard %s", shard.ID)
 	shard.SetLeaseOwner("")
 
-	// Release the lease by wiping out the lease owner for the shard
-	// Note: we don't need to do anything in case of error here and shard lease will eventuall be expired.
-	if err := sc.checkpointer.RemoveLeaseOwner(shard.ID, sc.consumerID); err != nil {
+	// Release the shard
+	// Note: we don't need to do anything in case of error here and shard lease will eventually expire
+	if err := sc.checkpointer.ReleaseShard(shard.ID, sc.consumerID); err != nil {
 		log.Errorf("Failed to release shard lease or shard: %s Error: %+v", shard.ID, err)
 	}
 
