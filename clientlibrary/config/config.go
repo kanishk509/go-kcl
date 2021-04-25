@@ -103,6 +103,9 @@ const (
 	// stream due to the max limit.
 	DefaultMaxLeasesForWorker = math.MaxInt16
 
+	// Time added to LeaseTimeout after which the shard claim will expire
+	DefaultClaimExpirePeriodMillis = 30000
+
 	// Max leases to steal from another worker at one time (for load balancing).
 	// Setting this to a higher number can allow for faster load convergence (e.g. during deployments, cold starts),
 	// but can cause higher churn in the system.

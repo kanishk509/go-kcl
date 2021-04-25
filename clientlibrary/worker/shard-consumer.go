@@ -128,7 +128,7 @@ func (sc *ShardConsumer) getShardIterator(shard *par.ShardStatus) (*string, erro
 // getRecords continously poll one shard for data record
 // Precondition: it currently has the lease on the shard.
 func (sc *ShardConsumer) getRecords(shard *par.ShardStatus) error {
-	defer sc.releaseLease(shard)
+	defer sc.removeLeaseForClosedShard(shard)
 
 	log := sc.kclConfig.Logger
 
@@ -170,6 +170,8 @@ func (sc *ShardConsumer) getRecords(shard *par.ShardStatus) error {
 			log.Infof("Shard %s being stolen from us", shard.ID)
 			shutdownInput := &kcl.ShutdownInput{ShutdownReason: kcl.ZOMBIE}
 			sc.recordProcessor.Shutdown(shutdownInput)
+
+			sc.releaseShardForStealing(shard)
 			return nil
 		}
 
@@ -319,15 +321,35 @@ func (sc *ShardConsumer) waitOnParentShard(shard *par.ShardStatus) error {
 }
 
 // Cleanup the internal lease cache
-func (sc *ShardConsumer) releaseLease(shard *par.ShardStatus) {
+func (sc *ShardConsumer) removeLeaseForClosedShard(shard *par.ShardStatus) {
 	log := sc.kclConfig.Logger
-	log.Infof("Release lease for shard %s", shard.ID)
+
+	if shard.GetLeaseOwner() != sc.consumerID {
+		return
+	}
+
+	log.Infof("Remove lease for shard %s", shard.ID)
 	shard.SetLeaseOwner("")
 
 	// Release the shard
 	// Note: we don't need to do anything in case of error here and shard lease will eventually expire
+	if err := sc.checkpointer.RemoveLeaseOwner(shard.ID, sc.consumerID); err != nil {
+		log.Errorf("Failed to remove shard lease: %s Error: %+v", shard.ID, err)
+	}
+
+	// reporting lease lose metrics
+	sc.mService.LeaseLost(shard.ID)
+}
+
+func (sc *ShardConsumer) releaseShardForStealing(shard *par.ShardStatus) {
+	log := sc.kclConfig.Logger
+	log.Infof("Release lease for shard %s", shard.ID)
+	shard.SetLeaseOwner(chk.ShardReleased)
+
+	// Release the shard
+	// Note: we don't need to do anything in case of error here and shard lease will eventually expire
 	if err := sc.checkpointer.ReleaseShard(shard.ID, sc.consumerID); err != nil {
-		log.Errorf("Failed to release shard lease or shard: %s Error: %+v", shard.ID, err)
+		log.Errorf("Failed to release shard for stealing: %s Error: %+v", shard.ID, err)
 	}
 
 	// reporting lease lose metrics

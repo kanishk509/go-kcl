@@ -81,7 +81,7 @@ type Checkpointer interface {
 	ReleaseShard(string, string) error
 
 	// FetchWorkers returns a map of active workers and the shards assigned to each
-	FetchWorkers() (map[string][]string, error)
+	FetchActiveShardsAndWorkers() (int, map[string][]string, error)
 
 	// ClaimShard marks a shard to be stolen by another worker
 	ClaimShard(*par.ShardStatus, string, string) error

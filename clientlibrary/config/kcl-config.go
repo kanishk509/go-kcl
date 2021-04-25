@@ -91,6 +91,7 @@ func NewKinesisClientLibConfigWithCredentials(applicationName, streamName, regio
 		ShutdownGraceMillis:                              DefaultShutdownGraceMillis,
 		MaxLeasesForWorker:                               DefaultMaxLeasesForWorker,
 		MaxLeasesToStealAtOneTime:                        DefaultMaxLeasesToStealAtOneTime,
+		ClaimExpirePeriodMillis:                          DefaultClaimExpirePeriodMillis,
 		InitialLeaseTableReadCapacity:                    DefaultInitialLeaseTableReadCapacity,
 		InitialLeaseTableWriteCapacity:                   DefaultInitialLeaseTableWriteCapacity,
 		SkipShardSyncAtWorkerInitializationIfLeasesExist: DefaultSkipShardSyncAtStartupIfLeasesExist,
@@ -183,6 +184,12 @@ func (c *KinesisClientLibConfiguration) WithMaxLeasesForWorker(n int) *KinesisCl
 func (c *KinesisClientLibConfiguration) WithIdleTimeBetweenReadsInMillis(idleTimeBetweenReadsInMillis int) *KinesisClientLibConfiguration {
 	checkIsValuePositive("IdleTimeBetweenReadsInMillis", idleTimeBetweenReadsInMillis)
 	c.IdleTimeBetweenReadsInMillis = idleTimeBetweenReadsInMillis
+	return c
+}
+
+func (c *KinesisClientLibConfiguration) WithClaimExpirePeriodMillis(claimExpirePeriodMillis int) *KinesisClientLibConfiguration {
+	checkIsValuePositive("ClaimExpirePeriodMillis", claimExpirePeriodMillis)
+	c.ClaimExpirePeriodMillis = claimExpirePeriodMillis
 	return c
 }
 

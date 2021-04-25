@@ -83,14 +83,15 @@ func NewWorker(factory kcl.IRecordProcessorFactory, kclConfig *config.KinesisCli
 	rng := rand.New(rand.NewSource(time.Now().UnixNano()))
 
 	return &Worker{
-		streamName:       kclConfig.StreamName,
-		regionName:       kclConfig.RegionName,
-		workerID:         kclConfig.WorkerID,
-		processorFactory: factory,
-		kclConfig:        kclConfig,
-		mService:         mService,
-		done:             false,
-		rng:              rng,
+		streamName:           kclConfig.StreamName,
+		regionName:           kclConfig.RegionName,
+		workerID:             kclConfig.WorkerID,
+		processorFactory:     factory,
+		kclConfig:            kclConfig,
+		mService:             mService,
+		done:                 false,
+		rng:                  rng,
+		shardStealInProgress: false,
 	}
 }
 
@@ -277,7 +278,7 @@ func (w *Worker) eventLoop() {
 
 				stealingShard := false
 				if shard.ClaimedBy != "" {
-					if time.Now().After(shard.LeaseTimeout.Add(time.Duration(w.kclConfig.ClaimExpirePeriodMillis) * time.Millisecond)) {
+					if time.Now().UTC().After(shard.LeaseTimeout.Add(time.Duration(w.kclConfig.ClaimExpirePeriodMillis) * time.Millisecond)) {
 						// now > LeaseTimeout + ClaimExpire
 						// Claim expired
 						log.Debugf("Claim by %s on %s expired. Ignoring the claim.", shard.ClaimedBy, shard.ID)
@@ -327,6 +328,11 @@ func (w *Worker) eventLoop() {
 			}
 		}
 
+		err = w.rebalance()
+		if err != nil {
+			log.Errorf("Error in rebalancing : %+v", err)
+		}
+
 		select {
 		case <-*w.stop:
 			log.Infof("Shutting down...")
@@ -339,7 +345,7 @@ func (w *Worker) eventLoop() {
 
 func (w *Worker) rebalance() error {
 	log := w.kclConfig.Logger
-	workers, err := w.checkpointer.FetchWorkers()
+	numActiveShards, workers, err := w.checkpointer.FetchActiveShardsAndWorkers()
 	if err != nil {
 		log.Errorf("Error in fetching workers")
 		return err
@@ -362,10 +368,9 @@ func (w *Worker) rebalance() error {
 		w.shardStealInProgress = false
 	}
 
-	numShards := len(w.shardStatus)
 	numActiveWorkers := len(workers)
 
-	if numActiveWorkers >= numShards {
+	if numActiveWorkers >= numActiveShards {
 		log.Debugf("1:1 shard allocation. More workers are redundant")
 		return nil
 	}
@@ -379,12 +384,12 @@ func (w *Worker) rebalance() error {
 		numActiveWorkers++
 	}
 
-	optimalNumShards := numShards / numActiveWorkers
+	optimalNumShards := numActiveShards / numActiveWorkers
 
-	log.Debugf("Number of shards", numShards)
-	log.Debugf("Number of active workers", numActiveWorkers)
-	log.Debugf("Optimal num of shards", optimalNumShards)
-	log.Debugf("Currently owned shards", numOwnedShards)
+	log.Debugf("Number of shards: %d", numActiveShards)
+	log.Debugf("Number of active workers: %d", numActiveWorkers)
+	log.Debugf("Optimal num of shards: %d", optimalNumShards)
+	log.Debugf("Currently owned shards: %d", numOwnedShards)
 
 	if numOwnedShards+1 > optimalNumShards || numOwnedShards+1 > w.kclConfig.MaxLeasesForWorker {
 		log.Debugf("Have enough shards, not stealing any")
@@ -443,7 +448,6 @@ func (w *Worker) getShardIDs(nextToken string, shardInfo map[string]bool) error 
 	}
 
 	for _, s := range listShards.Shards {
-		// record avail shardId from fresh reading from Kinesis
 		shardInfo[*s.ShardId] = true
 
 		// found new shard

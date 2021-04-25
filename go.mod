@@ -5,6 +5,7 @@ go 1.15
 require (
 	github.com/aws/aws-sdk-go v1.38.17
 	github.com/awslabs/kinesis-aggregation/go v0.0.0-20210222131425-398fbd4b430d
+	github.com/golang/glog v0.0.0-20160126235308-23def4e6c14b
 	github.com/golang/protobuf v1.5.2
 	github.com/google/uuid v1.2.0
 	github.com/prometheus/client_golang v1.10.0
