@@ -266,8 +266,10 @@ func (w *Worker) eventLoop() {
 				if err != nil {
 					// checkpoint not existing yet is not a problem
 					if err != chk.ErrSequenceIDNotFound {
-						log.Errorf(" Error: %+v", err)
+						log.Errorf("Error in fetching checkpoint: %+v", err)
 						continue
+					} else {
+						log.Warnf("Error in fetching checkpoint: %+v", err)
 					}
 				}
 
@@ -278,11 +280,13 @@ func (w *Worker) eventLoop() {
 
 				stealingShard := false
 				if shard.ClaimedBy != "" {
+					log.Debugf("Found claim on %s by %s.", shard.ID, shard.ClaimedBy)
 					if time.Now().UTC().After(shard.LeaseTimeout.Add(time.Duration(w.kclConfig.ClaimExpirePeriodMillis) * time.Millisecond)) {
 						// now > LeaseTimeout + ClaimExpire
 						// Claim expired
-						log.Debugf("Claim by %s on %s expired. Ignoring the claim.", shard.ClaimedBy, shard.ID)
+						log.Debugf("Claim by %s on %s expired, clearing the claim.", shard.ClaimedBy, shard.ID)
 						w.checkpointer.ClearClaim(shard.ID, shard.ClaimedBy)
+						shard.ClaimedBy = ""
 					} else if shard.ClaimedBy != w.workerID {
 						// claimed by another worker
 						log.Debugf("Shard %s being stolen by %s.", shard.ID, shard.ClaimedBy)
@@ -296,6 +300,8 @@ func (w *Worker) eventLoop() {
 						log.Debugf("Shard %s released us(%s).", shard.ID, w.workerID)
 						stealingShard = true
 					}
+				} else {
+					log.Debugf("No claim found on %s.", shard.ID)
 				}
 
 				err = w.checkpointer.GetLease(shard, w.workerID)
@@ -345,6 +351,7 @@ func (w *Worker) eventLoop() {
 
 func (w *Worker) rebalance() error {
 	log := w.kclConfig.Logger
+
 	numActiveShards, workers, err := w.checkpointer.FetchActiveShardsAndWorkers()
 	if err != nil {
 		log.Errorf("Error in fetching workers")

@@ -73,8 +73,9 @@ func (s *streaming) Subscribe(
 		WithMaxRecords(50).
 		WithLeaseRefreshPeriodMillis(30 * 1000).
 		WithFailoverTimeMillis(60 * 1000).
-		WithIdleTimeBetweenReadsInMillis(5 * 1000).
+		WithIdleTimeBetweenReadsInMillis(10 * 1000).
 		WithShardSyncIntervalMillis(10 * 1000).
+		WithClaimExpirePeriodMillis(30 * 1000).
 		WithLogger(loggerForKCL)
 
 	worker := wk.NewWorker(recordProcessorFactory(s, dynamoSvc), kclConfig)

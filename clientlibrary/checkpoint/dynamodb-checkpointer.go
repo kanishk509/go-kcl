@@ -130,7 +130,7 @@ func (checkpointer *DynamoCheckpoint) GetLease(shard *par.ShardStatus, newAssign
 
 	if claimedByOk {
 		if claimedBy := *claimedVar.S; claimedBy != newAssignTo {
-			return ErrLeaseNotAcquired{"shard claimed by another worker"}
+			return ErrLeaseNotAcquired{"shard claimed by another worker(" + claimedBy + ")"}
 		}
 	}
 
@@ -241,16 +241,8 @@ func (checkpointer *DynamoCheckpoint) FetchCheckpoint(shard *par.ShardStatus) er
 		return err
 	}
 
-	sequenceID, ok := checkpoint[SequenceNumberKey]
-	if !ok {
-		return ErrSequenceIDNotFound
-	}
-	checkpointer.log.Debugf("Retrieved Shard Iterator %s", *sequenceID.S)
-
 	shard.Mux.Lock()
 	defer shard.Mux.Unlock()
-
-	shard.Checkpoint = aws.StringValue(sequenceID.S)
 
 	if assignedTo, ok := checkpoint[LeaseOwnerKey]; ok {
 		shard.AssignedTo = aws.StringValue(assignedTo.S)
@@ -262,6 +254,15 @@ func (checkpointer *DynamoCheckpoint) FetchCheckpoint(shard *par.ShardStatus) er
 
 	if claimedBy, ok := checkpoint[ClaimedByKey]; ok {
 		shard.ClaimedBy = aws.StringValue(claimedBy.S)
+	} else {
+		shard.ClaimedBy = ""
+	}
+
+	if sequenceID, ok := checkpoint[SequenceNumberKey]; ok {
+		shard.Checkpoint = aws.StringValue(sequenceID.S)
+		checkpointer.log.Debugf("Retrieved checkpoint sequence. %s", *sequenceID.S)
+	} else {
+		return ErrSequenceIDNotFound
 	}
 
 	return nil
@@ -384,7 +385,6 @@ func (checkpointer *DynamoCheckpoint) ClaimShard(shard *par.ShardStatus, fromWor
 	}
 
 	conditionalExpression := `AssignedTo = :assigned_to AND
-	(attribute_not_exists(Checkpoint) OR Checkpoint <> :shard_end) AND
 	attribute_not_exists(ClaimedBy)`
 
 	// need a string pointer for ShardEnd in expressionAttributeValues
@@ -430,7 +430,6 @@ func (checkpointer *DynamoCheckpoint) ClearClaim(shardID string, claimOwner stri
 	}
 
 	return checkpointer.conditionalUpdate(conditionalExpression, expressionAttributeValues, key, updateExpression)
-
 }
 
 func (checkpointer *DynamoCheckpoint) createTable() error {

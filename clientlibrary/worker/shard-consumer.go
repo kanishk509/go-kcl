@@ -195,7 +195,7 @@ func (sc *ShardConsumer) getRecords(shard *par.ShardStatus) error {
 
 		getRecordsStartTime := time.Now()
 
-		log.Debugf("Trying to read %d record from iterator: %v", sc.kclConfig.MaxRecords, aws.StringValue(shardIterator))
+		log.Debugf("Trying to read %d records.", sc.kclConfig.MaxRecords)
 		getRecordsArgs := &kinesis.GetRecordsInput{
 			Limit:         aws.Int64(int64(sc.kclConfig.MaxRecords)),
 			ShardIterator: shardIterator,
@@ -227,8 +227,7 @@ func (sc *ShardConsumer) getRecords(shard *par.ShardStatus) error {
 		log.Debugf("Received %d original records.", len(getResp.Records))
 
 		// De-aggregate the records if they were published by the KPL.
-		dars := make([]*kinesis.Record, 0)
-		dars, err = deagg.DeaggregateRecords(getResp.Records)
+		dars, err := deagg.DeaggregateRecords(getResp.Records)
 
 		if err != nil {
 			// The error is caused by bad KPL publisher and just skip the bad records
@@ -343,6 +342,7 @@ func (sc *ShardConsumer) removeLeaseForClosedShard(shard *par.ShardStatus) {
 
 func (sc *ShardConsumer) releaseShardForStealing(shard *par.ShardStatus) {
 	log := sc.kclConfig.Logger
+
 	log.Infof("Release lease for shard %s", shard.ID)
 	shard.SetLeaseOwner(chk.ShardReleased)
 
