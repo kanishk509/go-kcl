@@ -375,26 +375,13 @@ func (checkpointer *DynamoCheckpoint) FetchActiveShardsAndWorkers() (int, map[st
 	return numActiveShards, workers, nil
 }
 
-func (checkpointer *DynamoCheckpoint) ClaimShard(shard *par.ShardStatus, fromWorkerID string, toWorkerID string) error {
-	err := checkpointer.FetchCheckpoint(shard)
-	if err != nil {
-		// checkpoint not existing yet is not a problem
-		if err != ErrSequenceIDNotFound {
-			return err
-		}
-	}
-
+func (checkpointer *DynamoCheckpoint) ClaimShard(shardID string, fromWorkerID string, toWorkerID string) error {
 	conditionalExpression := `AssignedTo = :assigned_to AND
 	attribute_not_exists(ClaimedBy)`
 
-	// need a string pointer for ShardEnd in expressionAttributeValues
-	shardEnd := ShardEnd
 	expressionAttributeValues := map[string]*dynamodb.AttributeValue{
 		":assigned_to": {
 			S: &fromWorkerID,
-		},
-		":shard_end": {
-			S: &shardEnd,
 		},
 		":claim_owner": {
 			S: &toWorkerID,
@@ -405,7 +392,7 @@ func (checkpointer *DynamoCheckpoint) ClaimShard(shard *par.ShardStatus, fromWor
 
 	key := map[string]*dynamodb.AttributeValue{
 		LeaseKeyKey: {
-			S: aws.String(shard.ID),
+			S: aws.String(shardID),
 		},
 	}
 

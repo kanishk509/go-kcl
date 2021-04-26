@@ -84,11 +84,11 @@ type Checkpointer interface {
 	FetchActiveShardsAndWorkers() (int, map[string][]string, error)
 
 	// ClaimShard marks a shard to be stolen by another worker
-	ClaimShard(*par.ShardStatus, string, string) error
+	ClaimShard(string, string, string) error
 
 	// ClearClaim removes the claim on a shard
 	ClearClaim(string, string) error
 }
 
 // ErrSequenceIDNotFound is returned by FetchCheckpoint when no SequenceID is found
-var ErrSequenceIDNotFound = errors.New("SequenceIDNotFoundForShard")
+var ErrSequenceIDNotFound = errors.New("SequenceID not found for shard")

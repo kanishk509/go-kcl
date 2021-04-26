@@ -265,11 +265,11 @@ func (w *Worker) eventLoop() {
 				err := w.checkpointer.FetchCheckpoint(shard)
 				if err != nil {
 					// checkpoint not existing yet is not a problem
-					if err != chk.ErrSequenceIDNotFound {
+					if err == chk.ErrSequenceIDNotFound {
+						log.Warnf(err.Error())
+					} else {
 						log.Errorf("Error in fetching checkpoint: %+v", err)
 						continue
-					} else {
-						log.Warnf("Error in fetching checkpoint: %+v", err)
 					}
 				}
 
@@ -300,8 +300,6 @@ func (w *Worker) eventLoop() {
 						log.Debugf("Shard %s released us(%s).", shard.ID, w.workerID)
 						stealingShard = true
 					}
-				} else {
-					log.Debugf("No claim found on %s.", shard.ID)
 				}
 
 				err = w.checkpointer.GetLease(shard, w.workerID)
@@ -424,11 +422,10 @@ func (w *Worker) rebalance() error {
 	shardToSteal := workers[stealFrom][rand.Intn(maxNumShards)]
 
 	log.Debugf("Attempting to steal shard: %s. From %s to %s", shardToSteal, stealFrom, w.workerID)
-	err = w.checkpointer.ClaimShard(&par.ShardStatus{
-		ID: shardToSteal,
-	}, stealFrom, w.workerID)
+	err = w.checkpointer.ClaimShard(shardToSteal, stealFrom, w.workerID)
 	if err != nil {
 		w.shardStealInProgress = true
+		log.Debugf("Shard %s claimed for %s.", shardToSteal, w.workerID)
 	}
 
 	return err
@@ -459,7 +456,7 @@ func (w *Worker) getShardIDs(nextToken string, shardInfo map[string]bool) error 
 
 		// found new shard
 		if _, ok := w.shardStatus[*s.ShardId]; !ok {
-			log.Infof("Found new shard with id %s", *s.ShardId)
+			log.Infof("Found new shard: %s", *s.ShardId)
 			w.shardStatus[*s.ShardId] = &par.ShardStatus{
 				ID:                     *s.ShardId,
 				ParentShardId:          aws.StringValue(s.ParentShardId),
