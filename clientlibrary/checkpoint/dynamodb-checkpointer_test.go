@@ -149,7 +149,7 @@ func TestGetLeaseAquired(t *testing.T) {
 		ID:  shard.ID,
 		Mux: &sync.Mutex{},
 	}
-	checkpoint.FetchCheckpoint(status)
+	checkpoint.FetchShardStatus(status)
 
 	// checkpointer and parent shard id should be the same
 	assert.Equal(t, shard.Checkpoint, status.Checkpoint)

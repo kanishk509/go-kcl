@@ -262,7 +262,7 @@ func (w *Worker) eventLoop() {
 					continue
 				}
 
-				err := w.checkpointer.FetchCheckpoint(shard)
+				err := w.checkpointer.FetchShardStatus(shard)
 				if err != nil {
 					// checkpoint not existing yet is not a problem
 					if err == chk.ErrSequenceIDNotFound {

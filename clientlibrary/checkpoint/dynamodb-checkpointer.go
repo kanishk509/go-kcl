@@ -234,8 +234,8 @@ func (checkpointer *DynamoCheckpoint) CheckpointSequence(shard *par.ShardStatus)
 	return checkpointer.saveItem(marshalledCheckpoint)
 }
 
-// FetchCheckpoint retrieves the checkpoint for the given shard
-func (checkpointer *DynamoCheckpoint) FetchCheckpoint(shard *par.ShardStatus) error {
+// FetchShardStatus retrieves the details(checkpoint, assignee, claim, etc.) for the given shard
+func (checkpointer *DynamoCheckpoint) FetchShardStatus(shard *par.ShardStatus) error {
 	checkpoint, err := checkpointer.getItem(shard.ID)
 	if err != nil {
 		return err

@@ -76,7 +76,7 @@ func (sc *ShardConsumer) getShardIterator(shard *par.ShardStatus) (*string, erro
 	log := sc.kclConfig.Logger
 
 	// Get checkpoint of the shard from dynamoDB
-	err := sc.checkpointer.FetchCheckpoint(shard)
+	err := sc.checkpointer.FetchShardStatus(shard)
 	if err != nil && err != chk.ErrSequenceIDNotFound {
 		return nil, err
 	}
@@ -158,7 +158,7 @@ func (sc *ShardConsumer) getRecords(shard *par.ShardStatus) error {
 	retriedErrors := 0
 
 	for {
-		err := sc.checkpointer.FetchCheckpoint(shard)
+		err := sc.checkpointer.FetchShardStatus(shard)
 		if err != nil && err != chk.ErrSequenceIDNotFound {
 			log.Errorf("Error fetching checkpoint", err)
 			time.Sleep(time.Duration(sc.kclConfig.IdleTimeBetweenReadsInMillis) * time.Millisecond)
@@ -306,7 +306,7 @@ func (sc *ShardConsumer) waitOnParentShard(shard *par.ShardStatus) error {
 	}
 
 	for {
-		if err := sc.checkpointer.FetchCheckpoint(pshard); err != nil {
+		if err := sc.checkpointer.FetchShardStatus(pshard); err != nil {
 			return err
 		}
 

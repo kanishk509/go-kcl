@@ -76,7 +76,7 @@ func TestWorkerInjectCheckpointer(t *testing.T) {
 		ID:  shardID,
 		Mux: &sync.Mutex{},
 	}
-	checkpointer.FetchCheckpoint(status)
+	checkpointer.FetchShardStatus(status)
 
 	// checkpointer should be the same
 	assert.NotEmpty(t, status.Checkpoint)

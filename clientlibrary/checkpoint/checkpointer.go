@@ -68,8 +68,8 @@ type Checkpointer interface {
 	// CheckpointSequence writes a checkpoint at the designated sequence ID
 	CheckpointSequence(*par.ShardStatus) error
 
-	// FetchCheckpoint retrieves the checkpoint for the given shard
-	FetchCheckpoint(*par.ShardStatus) error
+	// FetchShardStatus retrieves the details(checkpoint, assignee, claim, etc.) for the given shard
+	FetchShardStatus(*par.ShardStatus) error
 
 	// RemoveLeaseInfo to remove lease info for shard entry because the shard no longer exists
 	RemoveLeaseInfo(string) error
@@ -90,5 +90,5 @@ type Checkpointer interface {
 	ClearClaim(string, string) error
 }
 
-// ErrSequenceIDNotFound is returned by FetchCheckpoint when no SequenceID is found
+// ErrSequenceIDNotFound is returned by FetchShardStatus when no SequenceID is found
 var ErrSequenceIDNotFound = errors.New("SequenceID not found for shard")
