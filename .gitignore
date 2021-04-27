@@ -8,6 +8,7 @@
 /vms
 /run
 /go
+/main
 .hmake
 .hmakerc
 .project
