@@ -390,36 +390,48 @@ func (w *Worker) rebalance() error {
 	}
 
 	optimalNumShards := numActiveShards / numActiveWorkers
+	remainder := numActiveShards - optimalNumShards*numActiveWorkers
 
 	log.Debugf("Number of shards: %d", numActiveShards)
 	log.Debugf("Number of active workers: %d", numActiveWorkers)
-	log.Debugf("Optimal num of shards: %d", optimalNumShards)
 	log.Debugf("Currently owned shards: %d", numOwnedShards)
 
-	if numOwnedShards+1 > optimalNumShards || numOwnedShards+1 > w.kclConfig.MaxLeasesForWorker {
-		log.Debugf("Have enough shards, not stealing any")
+	if remainder == 0 {
+		log.Debugf("Optimal num of shards: %d", optimalNumShards)
+	} else {
+		log.Debugf("Optimal num of shards: %d or %d", optimalNumShards, optimalNumShards+1)
+		optimalNumShards++
+	}
+
+	if numOwnedShards >= optimalNumShards {
+		log.Debugf("Have enough shards, not stealing any.")
+		return nil
+	}
+	if numOwnedShards >= w.kclConfig.MaxLeasesForWorker {
+		log.Debugf("MaxLeasesForWorker reached, not stealing any.")
 		return nil
 	}
 
-	maxNumShards := optimalNumShards
+	// find the worker with the maximum number of shards allocated
+	maxAllocatedShards := optimalNumShards
 	var stealFrom string
 
 	for w, shards := range workers {
-		if len(shards) > maxNumShards {
-			maxNumShards = len(shards)
+		if len(shards) > maxAllocatedShards {
+			maxAllocatedShards = len(shards)
 			stealFrom = w
 		}
 	}
 
 	if stealFrom == "" {
-		log.Debugf("Not all shards allocated. Not stealing any")
+		log.Debugf("Optimal allocation or vacant shards present. Not stealing any.")
 		return nil
 	}
 
 	// steal a random shard from the worker with the maximum shards
 	w.shardStealInProgress = true
 	rand.Seed(time.Now().Unix())
-	shardToSteal := workers[stealFrom][rand.Intn(maxNumShards)]
+	shardToSteal := workers[stealFrom][rand.Intn(maxAllocatedShards)]
 
 	log.Debugf("Attempting to steal shard: %s. From %s to %s", shardToSteal, stealFrom, w.workerID)
 	err = w.checkpointer.ClaimShard(shardToSteal, stealFrom, w.workerID)
