@@ -176,7 +176,7 @@ func (sc *ShardConsumer) getRecords(shard *par.ShardStatus) error {
 		}
 
 		if time.Now().UTC().After(shard.LeaseTimeout.Add(-time.Duration(sc.kclConfig.LeaseRefreshPeriodMillis) * time.Millisecond)) {
-			log.Debugf("Refreshing lease on shard: %s for worker: %s", shard.ID, sc.consumerID)
+			// log.Debugf("Refreshing lease on shard: %s for worker: %s", shard.ID, sc.consumerID)
 			err = sc.checkpointer.GetLease(shard, sc.consumerID)
 			if err != nil {
 				// if errors.As(err, &chk.ErrLeaseNotAcquired{}) {
@@ -195,7 +195,7 @@ func (sc *ShardConsumer) getRecords(shard *par.ShardStatus) error {
 
 		getRecordsStartTime := time.Now()
 
-		log.Debugf("Trying to read %d records.", sc.kclConfig.MaxRecords)
+		// log.Debugf("Trying to read %d records.", sc.kclConfig.MaxRecords)
 		getRecordsArgs := &kinesis.GetRecordsInput{
 			Limit:         aws.Int64(int64(sc.kclConfig.MaxRecords)),
 			ShardIterator: shardIterator,
@@ -224,7 +224,9 @@ func (sc *ShardConsumer) getRecords(shard *par.ShardStatus) error {
 		// reset the retry count after success
 		retriedErrors = 0
 
-		log.Debugf("Received %d original records.", len(getResp.Records))
+		if numOrigRecords := len(getResp.Records); numOrigRecords > 0 {
+			log.Debugf("Received %d original records.", numOrigRecords)
+		}
 
 		// De-aggregate the records if they were published by the KPL.
 		dars, err := deagg.DeaggregateRecords(getResp.Records)
@@ -244,7 +246,10 @@ func (sc *ShardConsumer) getRecords(shard *par.ShardStatus) error {
 
 		recordLength := len(input.Records)
 		recordBytes := int64(0)
-		log.Debugf("Received %d de-aggregated records, MillisBehindLatest: %v", recordLength, input.MillisBehindLatest)
+
+		if recordLength > 0 {
+			log.Debugf("Received %d de-aggregated records, MillisBehindLatest: %v", recordLength, input.MillisBehindLatest)
+		}
 
 		for _, r := range dars {
 			recordBytes += int64(len(r.Data))
