@@ -41,7 +41,7 @@ import (
 )
 
 // Buffer metrics for at most this long before publishing to CloudWatch.
-const DEFAULT_CLOUDWATCH_METRICS_BUFFER_DURATION = 10 * time.Second
+const DEFAULT_CLOUDWATCH_METRICS_BUFFER_DURATION = 60 * time.Second
 
 type MonitoringService struct {
 	appName     string
