@@ -357,6 +357,10 @@ func (cw *MonitoringService) LeaseGained(shard string) {
 	m.Lock()
 	defer m.Unlock()
 	m.leasesHeld++
+
+	cw.perWorkerMetrics.Lock()
+	defer cw.perWorkerMetrics.Unlock()
+	cw.perWorkerMetrics.NumLeasesHeld++
 }
 
 func (cw *MonitoringService) LeaseLost(shard string) {
@@ -364,6 +368,10 @@ func (cw *MonitoringService) LeaseLost(shard string) {
 	m.Lock()
 	defer m.Unlock()
 	m.leasesHeld--
+
+	cw.perWorkerMetrics.Lock()
+	defer cw.perWorkerMetrics.Unlock()
+	cw.perWorkerMetrics.NumLeasesHeld--
 }
 
 func (cw *MonitoringService) LeaseRenewed(shard string) {
