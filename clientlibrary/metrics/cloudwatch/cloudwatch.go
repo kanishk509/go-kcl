@@ -67,7 +67,6 @@ type shardMetrics struct {
 	processedRecords   int64
 	processedBytes     int64
 	behindLatestMillis []float64
-	leasesHeld         int64
 	leaseRenewals      int64
 	getRecordsTime     []float64
 	processRecordsTime []float64
@@ -76,7 +75,10 @@ type shardMetrics struct {
 type workerMetrics struct {
 	sync.Mutex
 
-	NumLeasesHeld int64
+	leasesHeldByWorker int64
+	processedRecords   int64
+	processedBytes     int64
+	behindLatestMillis []float64
 }
 
 // NewMonitoringService returns a Monitoring service publishing metrics to CloudWatch.
@@ -205,13 +207,6 @@ func (cw *MonitoringService) flushShard(shard string, metric *shardMetrics) bool
 			Timestamp:  &metricTimestamp,
 			Value:      aws.Float64(float64(metric.leaseRenewals)),
 		},
-		{
-			Dimensions: leaseDimensions,
-			MetricName: aws.String("CurrentLeases"),
-			Unit:       aws.String("Count"),
-			Timestamp:  &metricTimestamp,
-			Value:      aws.Float64(float64(metric.leasesHeld)),
-		},
 	}
 
 	if len(metric.behindLatestMillis) > 0 {
@@ -280,7 +275,7 @@ func (cw *MonitoringService) flushShard(shard string, metric *shardMetrics) bool
 func (cw *MonitoringService) flushWorker(metric *workerMetrics) bool {
 	metric.Lock()
 
-	numLeasesDimensions := []*cwatch.Dimension{
+	defaultDimensions := []*cwatch.Dimension{
 		{
 			Name:  aws.String("KinesisStreamName"),
 			Value: &cw.streamName,
@@ -294,12 +289,40 @@ func (cw *MonitoringService) flushWorker(metric *workerMetrics) bool {
 
 	data := []*cwatch.MetricDatum{
 		{
-			Dimensions: numLeasesDimensions,
+			Dimensions: defaultDimensions,
 			MetricName: aws.String("NumLeasesHeld"),
 			Unit:       aws.String("Count"),
 			Timestamp:  &metricTimestamp,
-			Value:      aws.Float64(float64(metric.NumLeasesHeld)),
+			Value:      aws.Float64(float64(metric.leasesHeldByWorker)),
 		},
+		{
+			Dimensions: defaultDimensions,
+			MetricName: aws.String("RecordsProcessed"),
+			Unit:       aws.String("Count"),
+			Timestamp:  &metricTimestamp,
+			Value:      aws.Float64(float64(metric.processedRecords)),
+		},
+		{
+			Dimensions: defaultDimensions,
+			MetricName: aws.String("DataBytesProcessed"),
+			Unit:       aws.String("Bytes"),
+			Timestamp:  &metricTimestamp,
+			Value:      aws.Float64(float64(metric.processedBytes)),
+		},
+	}
+
+	if len(metric.behindLatestMillis) > 0 {
+		data = append(data, &cwatch.MetricDatum{
+			Dimensions: defaultDimensions,
+			MetricName: aws.String("MillisBehindLatest"),
+			Unit:       aws.String("Milliseconds"),
+			Timestamp:  &metricTimestamp,
+			StatisticValues: &cwatch.StatisticSet{
+				SampleCount: aws.Float64(float64(len(metric.behindLatestMillis))),
+				Sum:         sumFloat64(metric.behindLatestMillis),
+				Maximum:     maxFloat64(metric.behindLatestMillis),
+				Minimum:     minFloat64(metric.behindLatestMillis),
+			}})
 	}
 
 	// Publish metrics data to cloud watch
@@ -336,6 +359,10 @@ func (cw *MonitoringService) IncrRecordsProcessed(shard string, count int) {
 	m.Lock()
 	defer m.Unlock()
 	m.processedRecords += int64(count)
+
+	cw.perWorkerMetrics.Lock()
+	defer cw.perWorkerMetrics.Unlock()
+	cw.perWorkerMetrics.processedRecords += int64(count)
 }
 
 func (cw *MonitoringService) IncrBytesProcessed(shard string, count int64) {
@@ -343,6 +370,10 @@ func (cw *MonitoringService) IncrBytesProcessed(shard string, count int64) {
 	m.Lock()
 	defer m.Unlock()
 	m.processedBytes += count
+
+	cw.perWorkerMetrics.Lock()
+	defer cw.perWorkerMetrics.Unlock()
+	cw.perWorkerMetrics.processedBytes += count
 }
 
 func (cw *MonitoringService) MillisBehindLatest(shard string, millSeconds float64) {
@@ -350,28 +381,22 @@ func (cw *MonitoringService) MillisBehindLatest(shard string, millSeconds float6
 	m.Lock()
 	defer m.Unlock()
 	m.behindLatestMillis = append(m.behindLatestMillis, millSeconds)
+
+	cw.perWorkerMetrics.Lock()
+	defer cw.perWorkerMetrics.Unlock()
+	cw.perWorkerMetrics.behindLatestMillis = append(cw.perWorkerMetrics.behindLatestMillis, millSeconds)
 }
 
 func (cw *MonitoringService) LeaseGained(shard string) {
-	m := cw.getOrCreatePerShardMetrics(shard)
-	m.Lock()
-	defer m.Unlock()
-	m.leasesHeld++
-
 	cw.perWorkerMetrics.Lock()
 	defer cw.perWorkerMetrics.Unlock()
-	cw.perWorkerMetrics.NumLeasesHeld++
+	cw.perWorkerMetrics.leasesHeldByWorker++
 }
 
 func (cw *MonitoringService) LeaseLost(shard string) {
-	m := cw.getOrCreatePerShardMetrics(shard)
-	m.Lock()
-	defer m.Unlock()
-	m.leasesHeld--
-
 	cw.perWorkerMetrics.Lock()
 	defer cw.perWorkerMetrics.Unlock()
-	cw.perWorkerMetrics.NumLeasesHeld--
+	cw.perWorkerMetrics.leasesHeldByWorker--
 }
 
 func (cw *MonitoringService) LeaseRenewed(shard string) {
