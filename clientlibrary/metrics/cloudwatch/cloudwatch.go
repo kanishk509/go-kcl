@@ -290,6 +290,13 @@ func (cw *MonitoringService) flushWorker(metric *workerMetrics) bool {
 	data := []*cwatch.MetricDatum{
 		{
 			Dimensions: defaultDimensions,
+			MetricName: aws.String("WorkerHeartbeat"),
+			Unit:       aws.String("Count"),
+			Timestamp:  &metricTimestamp,
+			Value:      aws.Float64(1),
+		},
+		{
+			Dimensions: defaultDimensions,
 			MetricName: aws.String("NumLeasesHeld"),
 			Unit:       aws.String("Count"),
 			Timestamp:  &metricTimestamp,
