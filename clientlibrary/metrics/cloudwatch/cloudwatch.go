@@ -122,6 +122,7 @@ func (cw *MonitoringService) Init(appName, streamName, workerID string) error {
 		if err != nil {
 			cw.logger.Errorf("Error in creating dashboard. %+v", err)
 		}
+		cw.logger.Infof("Initialized cloudwatch dashboard.")
 	}
 
 	stopChan := make(chan struct{})
