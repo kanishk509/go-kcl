@@ -170,7 +170,7 @@ func (cw *MonitoringService) eventloop() {
 }
 
 func initDashboard(cw *MonitoringService) error {
-	dashboardName := cw.appName + "dashboard"
+	dashboardName := cw.appName + "-dashboard"
 
 	dashboardBodyFile, err := ioutil.ReadFile("dashboard_body.json")
 	if err != nil {
