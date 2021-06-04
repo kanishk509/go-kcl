@@ -362,7 +362,11 @@ func (cw *MonitoringService) flushWorker(metric *workerMetrics) bool {
 		MetricData: data,
 	})
 
-	if err != nil {
+	if err == nil {
+		metric.processedRecords = 0
+		metric.processedBytes = 0
+		metric.behindLatestMillis = []float64{}
+	} else {
 		cw.logger.Errorf("Error in publishing cloudwatch metrics. Error: %+v", err)
 	}
 
