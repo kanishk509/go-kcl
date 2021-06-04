@@ -28,8 +28,6 @@
 package cloudwatch
 
 import (
-	"io/ioutil"
-	"strings"
 	"sync"
 	"time"
 
@@ -171,15 +169,9 @@ func (cw *MonitoringService) eventloop() {
 
 func initDashboard(cw *MonitoringService) error {
 	dashboardName := cw.appName + "-dashboard"
+	dashboardBody := getDashboardBody(cw.appName)
 
-	dashboardBodyFile, err := ioutil.ReadFile("./dashboard_body.json")
-	if err != nil {
-		return err
-	}
-	dashboardBody := string(dashboardBodyFile)
-	dashboardBody = strings.Replace(dashboardBody, "$CLOUDWATCH_NAMESPACE", cw.appName, -1)
-
-	_, err = cw.svc.PutDashboard(&cwatch.PutDashboardInput{
+	_, err := cw.svc.PutDashboard(&cwatch.PutDashboardInput{
 		DashboardName: &dashboardName,
 		DashboardBody: &dashboardBody,
 	})
