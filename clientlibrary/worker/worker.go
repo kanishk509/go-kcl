@@ -375,8 +375,6 @@ func (w *Worker) rebalance() error {
 
 	numActiveWorkers := len(workers)
 
-	log.Debugf("Found %d active workers and %d active shards.", numActiveWorkers, numActiveShards)
-
 	if numActiveWorkers >= numActiveShards {
 		log.Debugf("1:1 shard allocation. More workers are redundant.")
 		return nil
