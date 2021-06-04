@@ -28,6 +28,8 @@
 package cloudwatch
 
 import (
+	"io/ioutil"
+	"strings"
 	"sync"
 	"time"
 
@@ -59,6 +61,9 @@ type MonitoringService struct {
 	svc              cloudwatchiface.CloudWatchAPI
 	perShardMetrics  *sync.Map
 	perWorkerMetrics *workerMetrics
+
+	// whether to create a CloudWatch dashboard
+	createDashboard bool
 }
 
 type shardMetrics struct {
@@ -83,17 +88,18 @@ type workerMetrics struct {
 
 // NewMonitoringService returns a Monitoring service publishing metrics to CloudWatch.
 func NewMonitoringService(region string, creds *credentials.Credentials) *MonitoringService {
-	return NewMonitoringServiceWithOptions(region, creds, logger.GetDefaultLogger(), DEFAULT_CLOUDWATCH_METRICS_BUFFER_DURATION)
+	return NewMonitoringServiceWithOptions(region, creds, logger.GetDefaultLogger(), DEFAULT_CLOUDWATCH_METRICS_BUFFER_DURATION, false)
 }
 
 // NewMonitoringServiceWithOptions returns a Monitoring service publishing metrics to
 // CloudWatch with the provided credentials, buffering duration and logger.
-func NewMonitoringServiceWithOptions(region string, creds *credentials.Credentials, logger logger.Logger, bufferDur time.Duration) *MonitoringService {
+func NewMonitoringServiceWithOptions(region string, creds *credentials.Credentials, logger logger.Logger, bufferDur time.Duration, createDashboard bool) *MonitoringService {
 	return &MonitoringService{
-		region:         region,
-		credentials:    creds,
-		logger:         logger,
-		bufferDuration: bufferDur,
+		region:          region,
+		credentials:     creds,
+		logger:          logger,
+		bufferDuration:  bufferDur,
+		createDashboard: createDashboard,
 	}
 }
 
@@ -112,6 +118,13 @@ func (cw *MonitoringService) Init(appName, streamName, workerID string) error {
 	cw.svc = cwatch.New(s)
 	cw.perShardMetrics = new(sync.Map)
 	cw.perWorkerMetrics = new(workerMetrics)
+
+	if cw.createDashboard {
+		err := initDashboard(cw)
+		if err != nil {
+			cw.logger.Errorf("Error in creating dashboard. %+v", err)
+		}
+	}
 
 	stopChan := make(chan struct{})
 	cw.stop = &stopChan
@@ -154,6 +167,24 @@ func (cw *MonitoringService) eventloop() {
 		case <-time.After(cw.bufferDuration):
 		}
 	}
+}
+
+func initDashboard(cw *MonitoringService) error {
+	dashboardName := cw.appName + "dashboard"
+
+	dashboardBodyFile, err := ioutil.ReadFile("dashboard_body.json")
+	if err != nil {
+		return err
+	}
+	dashboardBody := string(dashboardBodyFile)
+	dashboardBody = strings.ReplaceAll(dashboardBody, "$CLOUDWATCH_NAMESPACE", cw.appName)
+
+	_, err = cw.svc.PutDashboard(&cwatch.PutDashboardInput{
+		DashboardName: &dashboardName,
+		DashboardBody: &dashboardBody,
+	})
+
+	return err
 }
 
 func (cw *MonitoringService) flushShard(shard string, metric *shardMetrics) bool {
