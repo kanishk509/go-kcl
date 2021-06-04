@@ -177,7 +177,7 @@ func initDashboard(cw *MonitoringService) error {
 		return err
 	}
 	dashboardBody := string(dashboardBodyFile)
-	dashboardBody = strings.ReplaceAll(dashboardBody, "$CLOUDWATCH_NAMESPACE", cw.appName)
+	dashboardBody = strings.Replace(dashboardBody, "$CLOUDWATCH_NAMESPACE", cw.appName, -1)
 
 	_, err = cw.svc.PutDashboard(&cwatch.PutDashboardInput{
 		DashboardName: &dashboardName,
