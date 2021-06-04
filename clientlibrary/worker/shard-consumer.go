@@ -160,7 +160,7 @@ func (sc *ShardConsumer) getRecords(shard *par.ShardStatus) error {
 	for {
 		err := sc.checkpointer.FetchShardStatus(shard)
 		if err != nil && err != chk.ErrSequenceIDNotFound {
-			log.Errorf("Error fetching checkpoint", err)
+			log.Errorf("Error fetching checkpoint for %s: %+v", shard.ID, err)
 			time.Sleep(time.Duration(sc.kclConfig.IdleTimeBetweenReadsInMillis) * time.Millisecond)
 			continue
 		}
@@ -225,7 +225,7 @@ func (sc *ShardConsumer) getRecords(shard *par.ShardStatus) error {
 		retriedErrors = 0
 
 		if numOrigRecords := len(getResp.Records); numOrigRecords > 0 {
-			log.Debugf("Received %d original records.", numOrigRecords)
+			log.Debugf("Received %d original records from %s.", numOrigRecords, shard.ID)
 		}
 
 		// De-aggregate the records if they were published by the KPL.
@@ -248,7 +248,7 @@ func (sc *ShardConsumer) getRecords(shard *par.ShardStatus) error {
 		recordBytes := int64(0)
 
 		if recordLength > 0 {
-			log.Debugf("Received %d de-aggregated records, MillisBehindLatest: %v", recordLength, input.MillisBehindLatest)
+			log.Debugf("Received %d de-aggregated records from %s, MillisBehindLatest: %v", recordLength, shard.ID, input.MillisBehindLatest)
 		}
 
 		for _, r := range dars {
