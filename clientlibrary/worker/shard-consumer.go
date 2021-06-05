@@ -274,10 +274,8 @@ func (sc *ShardConsumer) getRecords(shard *par.ShardStatus) error {
 		sc.mService.IncrBytesProcessed(shard.ID, recordBytes)
 		sc.mService.MillisBehindLatest(shard.ID, float64(*getResp.MillisBehindLatest))
 
-		// Idle between each read, the user is responsible for checkpoint the progress
-		// This value is only used when no records are returned; if records are returned, it should immediately
-		// retrieve the next set of records.
-		if recordLength == 0 && aws.Int64Value(getResp.MillisBehindLatest) < int64(sc.kclConfig.IdleTimeBetweenReadsInMillis) {
+		// Idle time before next reads if we reached the latest record in the stream, i.e. fetched records < queried records
+		if recordLength < sc.kclConfig.MaxRecords && aws.Int64Value(getResp.MillisBehindLatest) < int64(sc.kclConfig.IdleTimeBetweenReadsInMillis) {
 			time.Sleep(time.Duration(sc.kclConfig.IdleTimeBetweenReadsInMillis) * time.Millisecond)
 		}
 
