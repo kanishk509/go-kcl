@@ -261,6 +261,8 @@ func (sc *ShardConsumer) getRecords(shard *par.ShardStatus) error {
 			// Delivery the events to the record processor
 			input.CacheEntryTime = &getRecordsStartTime
 			input.CacheExitTime = &processRecordsStartTime
+
+			log.Debugf("Sending records from %s to record processor.", shard.ID)
 			sc.recordProcessor.ProcessRecords(input)
 
 			// Convert from nanoseconds to milliseconds
