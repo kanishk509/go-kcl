@@ -35,13 +35,15 @@ type LogrusLogEntry struct {
 
 type LogrusLogger struct {
 	logger logrus.FieldLogger
+	tag    string
 }
 
 // NewLogrusLogger adapts existing logrus logger to Logger interface.
 // The call is responsible for configuring logrus logger appropriately.
-func NewLogrusLogger(lLogger logrus.FieldLogger) Logger {
+func NewLogrusLogger(lLogger logrus.FieldLogger, tag string) Logger {
 	return &LogrusLogger{
 		logger: lLogger,
+		tag:    tag,
 	}
 }
 
@@ -88,31 +90,32 @@ func NewLogrusLoggerWithConfig(config Configuration) Logger {
 
 	return &LogrusLogger{
 		logger: lLogger,
+		tag:    config.Tag,
 	}
 }
 
 func (l *LogrusLogger) Debugf(format string, args ...interface{}) {
-	l.logger.Debugf(format, args...)
+	l.logger.Debugf(l.tag+format, args...)
 }
 
 func (l *LogrusLogger) Infof(format string, args ...interface{}) {
-	l.logger.Infof(format, args...)
+	l.logger.Infof(l.tag+format, args...)
 }
 
 func (l *LogrusLogger) Warnf(format string, args ...interface{}) {
-	l.logger.Warnf(format, args...)
+	l.logger.Warnf(l.tag+format, args...)
 }
 
 func (l *LogrusLogger) Errorf(format string, args ...interface{}) {
-	l.logger.Errorf(format, args...)
+	l.logger.Errorf(l.tag+format, args...)
 }
 
 func (l *LogrusLogger) Fatalf(format string, args ...interface{}) {
-	l.logger.Fatalf(format, args...)
+	l.logger.Fatalf(l.tag+format, args...)
 }
 
 func (l *LogrusLogger) Panicf(format string, args ...interface{}) {
-	l.logger.Fatalf(format, args...)
+	l.logger.Fatalf(l.tag+format, args...)
 }
 
 func (l *LogrusLogger) WithFields(fields Fields) Logger {

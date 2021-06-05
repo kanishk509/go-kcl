@@ -257,8 +257,11 @@ func (w *Worker) eventLoop() {
 		// max number of lease has not been reached yet
 		if counter < w.kclConfig.MaxLeasesForWorker {
 			for _, shard := range w.shardStatus {
+				log.Debugf("Checking %s.", shard.ID)
+
 				// already owner of the shard
 				if shard.GetLeaseOwner() == w.workerID {
+					log.Debugf("Already own %s.", shard.ID)
 					continue
 				}
 
@@ -300,14 +303,19 @@ func (w *Worker) eventLoop() {
 						log.Debugf("Shard %s released us(%s).", shard.ID, w.workerID)
 						stealingShard = true
 					}
+				} else {
+					log.Debugf("No claim on %s.", shard.ID)
 				}
 
+				log.Debugf("Trying to get lease for %s.", shard.ID)
 				err = w.checkpointer.GetLease(shard, w.workerID)
 				if err != nil {
 					// cannot get lease on the shard
 					// if !errors.As(err, &chk.ErrLeaseNotAcquired{}) {
 					log.Errorf("Cannot get lease: %+v", err)
 					continue
+				} else {
+					log.Debugf("Gained lease for %s.", shard.ID)
 				}
 
 				if stealingShard {

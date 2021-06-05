@@ -176,7 +176,7 @@ func (sc *ShardConsumer) getRecords(shard *par.ShardStatus) error {
 		}
 
 		if time.Now().UTC().After(shard.LeaseTimeout.Add(-time.Duration(sc.kclConfig.LeaseRefreshPeriodMillis) * time.Millisecond)) {
-			// log.Debugf("Refreshing lease on shard: %s for worker: %s", shard.ID, sc.consumerID)
+			log.Debugf("Refreshing lease on shard: %s for worker: %s", shard.ID, sc.consumerID)
 			err = sc.checkpointer.GetLease(shard, sc.consumerID)
 			if err != nil {
 				// if errors.As(err, &chk.ErrLeaseNotAcquired{}) {
@@ -195,7 +195,7 @@ func (sc *ShardConsumer) getRecords(shard *par.ShardStatus) error {
 
 		getRecordsStartTime := time.Now()
 
-		// log.Debugf("Trying to read %d records.", sc.kclConfig.MaxRecords)
+		log.Debugf("Trying to read %d records from %s.", sc.kclConfig.MaxRecords, shard.ID)
 		getRecordsArgs := &kinesis.GetRecordsInput{
 			Limit:         aws.Int64(int64(sc.kclConfig.MaxRecords)),
 			ShardIterator: shardIterator,

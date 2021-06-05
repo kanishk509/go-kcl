@@ -35,7 +35,6 @@ import (
 	"github.com/kanishk509/go-kcl/clientlibrary/metrics/prometheus"
 	wk "github.com/kanishk509/go-kcl/clientlibrary/worker"
 	"github.com/kanishk509/go-kcl/logger"
-	zaplogger "github.com/kanishk509/go-kcl/logger/zap"
 	"github.com/prometheus/common/expfmt"
 	"github.com/stretchr/testify/assert"
 )
@@ -101,31 +100,12 @@ func TestWorkerWithTimestamp(t *testing.T) {
 }
 
 func TestWorkerWithSigInt(t *testing.T) {
-	// At miminal. use standard zap logger
-	//zapLogger, err := zap.NewProduction()
-	//assert.Nil(t, err)
-	//log := zaplogger.NewZapLogger(zapLogger.Sugar())
-	//
-	// In order to have precise control over logging. Use logger with config.
-	config := logger.Configuration{
-		EnableConsole:     true,
-		ConsoleLevel:      logger.Debug,
-		ConsoleJSONFormat: true,
-		EnableFile:        true,
-		FileLevel:         logger.Info,
-		FileJSONFormat:    true,
-		Filename:          "log.log",
-	}
-	// use zap logger
-	log := zaplogger.NewZapLoggerWithConfig(config)
-
 	kclConfig := cfg.NewKinesisClientLibConfig("appName", streamName, regionName, workerID).
 		WithInitialPositionInStream(cfg.LATEST).
 		WithMaxRecords(10).
 		WithMaxLeasesForWorker(1).
 		WithShardSyncIntervalMillis(5000).
-		WithFailoverTimeMillis(300000).
-		WithLogger(log)
+		WithFailoverTimeMillis(300000)
 
 	runTest(kclConfig, true, t)
 }
@@ -233,7 +213,7 @@ func getMetricsConfig(kclConfig *cfg.KinesisClientLibConfiguration, service stri
 		return cloudwatch.NewMonitoringServiceWithOptions(kclConfig.RegionName,
 			kclConfig.KinesisCredentials,
 			kclConfig.Logger,
-			cloudwatch.DEFAULT_CLOUDWATCH_METRICS_BUFFER_DURATION)
+			cloudwatch.DEFAULT_CLOUDWATCH_METRICS_BUFFER_DURATION, false)
 	}
 
 	if service == "prometheus" {

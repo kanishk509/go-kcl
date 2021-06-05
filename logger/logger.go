@@ -92,11 +92,13 @@ type Configuration struct {
 	// backup files is the computer's local time.  The default is to use UTC
 	// time.
 	LocalTime bool
+
+	Tag string
 }
 
 // GetDefaultLogger creates a default logger.
 func GetDefaultLogger() Logger {
-	return NewLogrusLogger(logrus.StandardLogger())
+	return NewLogrusLogger(logrus.StandardLogger(), "[go-kcl] ")
 }
 
 // normalizeConfig to enforce default value in configuration.
