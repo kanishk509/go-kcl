@@ -467,6 +467,10 @@ func (cw *MonitoringService) RecordProcessRecordsTime(shard string, time float64
 	m.Lock()
 	defer m.Unlock()
 	m.processRecordsTime = append(m.processRecordsTime, time)
+
+	cw.perWorkerMetrics.Lock()
+	defer cw.perWorkerMetrics.Unlock()
+	cw.perWorkerMetrics.processRecordsTime = append(cw.perWorkerMetrics.processRecordsTime, time)
 }
 
 func (cw *MonitoringService) getOrCreatePerShardMetrics(shard string) *shardMetrics {
