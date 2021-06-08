@@ -82,6 +82,7 @@ type workerMetrics struct {
 	processedRecords   int64
 	processedBytes     int64
 	behindLatestMillis []float64
+	processRecordsTime []float64
 }
 
 // NewMonitoringService returns a Monitoring service publishing metrics to CloudWatch.
@@ -353,6 +354,20 @@ func (cw *MonitoringService) flushWorker(metric *workerMetrics) bool {
 				Sum:         sumFloat64(metric.behindLatestMillis),
 				Maximum:     maxFloat64(metric.behindLatestMillis),
 				Minimum:     minFloat64(metric.behindLatestMillis),
+			}})
+	}
+
+	if len(metric.processRecordsTime) > 0 {
+		data = append(data, &cwatch.MetricDatum{
+			Dimensions: defaultDimensions,
+			MetricName: aws.String("RecordProcessor.processRecords.Time"),
+			Unit:       aws.String("Milliseconds"),
+			Timestamp:  &metricTimestamp,
+			StatisticValues: &cwatch.StatisticSet{
+				SampleCount: aws.Float64(float64(len(metric.processRecordsTime))),
+				Sum:         sumFloat64(metric.processRecordsTime),
+				Maximum:     maxFloat64(metric.processRecordsTime),
+				Minimum:     minFloat64(metric.processRecordsTime),
 			}})
 	}
 
