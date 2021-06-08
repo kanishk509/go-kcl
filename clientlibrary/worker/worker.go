@@ -372,7 +372,7 @@ func (w *Worker) rebalance() error {
 	if w.shardStealInProgress {
 		for _, shard := range w.shardStatus {
 			if shard.ClaimedBy == w.workerID {
-				log.Debugf("Shard steal in progress: %s is stealing %s from %s", shard.ID, w.workerID, shard.AssignedTo)
+				log.Debugf("Shard steal in progress: %s is stealing %s from %s", w.workerID, shard.ID, shard.AssignedTo)
 				return nil
 			}
 		}
