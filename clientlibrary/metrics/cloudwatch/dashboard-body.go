@@ -26,13 +26,16 @@ const DASHBOARD_TEMPLATE = `
                         "label": "Count of leases held",
                         "showUnits": false
                     }
+                },
+                "legend": {
+                    "position": "hidden"
                 }
             }
         },
         {
             "height": 6,
-            "width": 24,
-            "y": 7,
+            "width": 12,
+            "y": 13,
             "x": 0,
             "type": "metric",
             "properties": {
@@ -50,6 +53,9 @@ const DASHBOARD_TEMPLATE = `
                         "label": "Milliseconds behind latest",
                         "showUnits": false
                     }
+                },
+                "legend": {
+                    "position": "hidden"
                 }
             }
         },
@@ -66,7 +72,7 @@ const DASHBOARD_TEMPLATE = `
         {
             "height": 6,
             "width": 12,
-            "y": 13,
+            "y": 7,
             "x": 0,
             "type": "metric",
             "properties": {
@@ -93,13 +99,16 @@ const DASHBOARD_TEMPLATE = `
                             "value": 0
                         }
                     ]
+                },
+                "legend": {
+                    "position": "hidden"
                 }
             }
         },
         {
             "height": 6,
             "width": 12,
-            "y": 13,
+            "y": 7,
             "x": 12,
             "type": "metric",
             "properties": {
@@ -117,6 +126,9 @@ const DASHBOARD_TEMPLATE = `
                         "showUnits": false,
                         "label": "Bytes processed per minute"
                     }
+                },
+                "legend": {
+                    "position": "hidden"
                 }
             }
         },
@@ -133,7 +145,7 @@ const DASHBOARD_TEMPLATE = `
         {
             "height": 6,
             "width": 12,
-            "y": 39,
+            "y": 33,
             "x": 0,
             "type": "metric",
             "properties": {
@@ -160,7 +172,7 @@ const DASHBOARD_TEMPLATE = `
         {
             "height": 6,
             "width": 12,
-            "y": 39,
+            "y": 33,
             "x": 12,
             "type": "metric",
             "properties": {
@@ -186,8 +198,8 @@ const DASHBOARD_TEMPLATE = `
         },
         {
             "height": 6,
-            "width": 24,
-            "y": 33,
+            "width": 12,
+            "y": 39,
             "x": 0,
             "type": "metric",
             "properties": {
@@ -242,7 +254,7 @@ const DASHBOARD_TEMPLATE = `
         {
             "height": 6,
             "width": 12,
-            "y": 26,
+            "y": 20,
             "x": 0,
             "type": "metric",
             "properties": {
@@ -266,7 +278,7 @@ const DASHBOARD_TEMPLATE = `
         {
             "height": 6,
             "width": 12,
-            "y": 26,
+            "y": 20,
             "x": 12,
             "type": "metric",
             "properties": {
@@ -299,8 +311,8 @@ const DASHBOARD_TEMPLATE = `
         },
         {
             "height": 6,
-            "width": 24,
-            "y": 20,
+            "width": 12,
+            "y": 26,
             "x": 0,
             "type": "metric",
             "properties": {
