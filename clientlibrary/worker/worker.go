@@ -256,7 +256,6 @@ func (w *Worker) eventLoop() {
 
 		// max number of lease has not been reached yet
 		if counter < w.kclConfig.MaxLeasesForWorker {
-			// if counter < 1 {
 			for _, shard := range w.shardStatus {
 				log.Debugf("Checking %s.", shard.ID)
 
